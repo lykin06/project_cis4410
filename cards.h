@@ -1,6 +1,10 @@
 #ifndef CARDS_H_
 #define CARDS_H_
 
+#define NUMBER_OF_CARDS 52
+#define MAX_SET 13
+#define MAX_SUIT 4
+
 typedef struct card_t
 {
 	enum {SPADES, HEARTS, DIAMONDS, CLUBS} suit;

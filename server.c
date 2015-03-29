@@ -9,6 +9,8 @@
 #include "values.h"
 #include "server.h"
 #include "parsing.h"
+#include "cards.h"
+#include "functions.h"
 
 // Address of the server
 Address myaddr;
@@ -22,8 +24,8 @@ socklen_t addrlen;
 // Integer holding the position of the next char to read
 int *next_char;
 
-// List of connected users
-User *users;
+// List of connected users, cannot have more than MAXUSERS users
+User users[MAXUSERS];
 
 // Number of connected users
 int number_users;
@@ -31,6 +33,25 @@ int alloc;
 
 // user's action
 int action;
+
+// Deck of cards
+Card deck[NUMBER_OF_CARDS];
+
+void init_server() {
+	int suit;
+	int set;
+	int card;
+
+	// Initialize the deck of cards
+	for(set = 0; set <= MAX_SET; ++set) {
+		for(suit = 0; suit <= MAX_SUIT; ++suit) {
+			card = set + suit;
+			deck[card].set = set;
+			deck[card].suit = suit;
+			deck[card].player = 0;
+		}
+	}
+}
 
 /*
  * Returns the id of the given username
