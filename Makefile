@@ -9,9 +9,9 @@ GTK = `pkg-config --cflags --libs gtk+-3.0 webkitgtk-3.0`
 default: $(TARGET)
 all: default
 
-OBJECTS_CLIENTS = client.c parsing.c
-OBJECTS_SERVER = server.c parsing.c
-HEADERS = server.h client.h parsing.h values.h
+OBJECTS_CLIENTS = client.c parsing.c functions.c
+OBJECTS_SERVER = server.c parsing.c functions.c
+HEADERS = server.h client.h parsing.h values.h cards.h functions.h
 OBJECTS = $(OBJECTS_SERVER) $(OBJECTS_CLIENTS)
 
 
@@ -19,7 +19,7 @@ OBJECTS = $(OBJECTS_SERVER) $(OBJECTS_CLIENTS)
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
 clients: $(OBJECTS_CLIENTS)
-	$(CC) $(OBJECTS_CLIENTS) $(CFLAGS) $(LIBS) -o $@
+	$(CC) $(OBJECTS_CLIENTS) $(GTK) $(CFLAGS) $(LIBS) -o $@
 
 server: $(OBJECTS_SERVER)
 	$(CC) $(OBJECTS_SERVER) $(CFLAGS) $(LIBS) -o $@

@@ -30,12 +30,12 @@ struct thread_data_t {
 };
 
 /*
- * Adds the connected users to the list
+ * Adds the connected players
  */
-void set_list_peers();
+void set_players();
 
 /*
- * Adds the user to the list of users
+ * Sets the player name
  */
 void add_user(char *message);
 
@@ -50,9 +50,9 @@ void remove_user(char *message);
 void broadcast(char *message);
 
 /*
- * Receives a message in p2p mode
+ * A user play a card
  */
-void peer_to_peer(char *message);
+void play_card(char *message);
 
 /*
  * Sends the message to the server

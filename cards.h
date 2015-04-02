@@ -1,6 +1,8 @@
 #ifndef CARDS_H_
 #define CARDS_H_
 
+// Defines the values for a French Card Deck
+
 #define NUMBER_OF_CARDS 52
 #define MAX_SET 13
 #define MAX_SUIT 4

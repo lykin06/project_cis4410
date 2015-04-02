@@ -13,6 +13,7 @@
 #include "values.h"
 #include "client.h"
 #include "parsing.h"
+#include "cards.h"
 
 Address addr;
 socklen_t len;
@@ -30,40 +31,46 @@ char *n;
 // Flag to stop the threads
 int loop;
 
-// Indicating to the user in the text chat if we sending in p2p
-char *indicator;
+// Stores the name of the selected card
+char *selected_card;
 
 // List of connected users
 GtkWidget *list;
 char *users;
 
-// Web wiew
+// Message wiew
 GtkWidget *view;
 
 // Number of connected users
 int number_users;
 
-// Label to print the number of users
+// Number of cards
+int cards;
+
+// Player number
+int player_number;
+
+// Flag indicating the turn
+int play;
+
+// Labels to print the number of users
 GtkWidget *label_users;
+GtkWidget *label_player_one;
+GtkWidget *label_player_two;
+GtkWidget *label_player_three;
 
 // Pointer to the next char to read
 int *next_char;
 
-// Flag indicating we are in the conference
-int conf;
-
-// Flag indicating if we are in p2p or if we are broadcasting
-int mode;
-
-// name of the client to send the message to in p2p
-char *peer;
-
-/* Enum for the list of users */
+/* Enum for the list of cards */
 enum
 {
 	LIST_ITEM = 0,
 	N_COLUMNS
 };
+
+// State of the game
+int state;
 
 /* 
  * Displays a plain text message into the text view
@@ -72,12 +79,40 @@ static void display_message(char *message, GtkWidget *view, char *tag) {
     GtkTextBuffer *buffer;
     GtkTextIter iter;
 
+   	printf("display_message \"%s\"\n", message);
+
     // Gets the buffer and the iter from the view
     buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
     gtk_text_buffer_get_iter_at_offset(buffer, &iter, 0);
 
     // Insert the message at the beginning of the text field
    	gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, message, -1, "lmarg", tag, NULL);
+
+   	printf("end display_message\n");
+}
+
+/*
+ * Sends the card to play to the user
+ */
+static void button_clicked(GtkButton *button, gpointer user_data)
+{
+	char buf[BUFSIZE];
+
+	if(play == WAIT) {
+		sprintf(buf, "It is not your turn, please wait.\n");
+		printf("%s", buf);
+		display_message(buf, view, "red_fg");
+	} else {
+		if(state == EXCHANGE) {
+			if(strcmp(selected_card, "No cards") != 0) {
+				sprintf(buf, "%d %d %s ", GAME, player_number, selected_card);
+				send_message(buf);
+				sprintf(selected_card, "No cards");
+			} else {
+				display_message("No card selected\n", view, "red_fg");
+			}
+		}
+	}
 }
 
 /* Called when the window is closed */
@@ -127,31 +162,20 @@ static void add_to_list(const gchar *str)
 }
 
 /*
- * Changes the broadcast mode to peer to peer with the selected user
+ * Changes the selected card
  * From: http://zetcode.com/tutorials/gtktutorial/gtktreeview/
  */
-void on_changed(GtkWidget *widget, gpointer label) 
+static void on_changed(GtkWidget *widget, gpointer label) 
 {
 	GtkTreeIter iter;
 	GtkTreeModel *model;
 	char text[BUFSIZE];
 
 	if (gtk_tree_selection_get_selected(GTK_TREE_SELECTION(widget), &model, &iter)) {
-		gtk_tree_model_get(model, &iter, LIST_ITEM, &peer,  -1);
-		gtk_label_set_text(GTK_LABEL(label), peer);
-		
-		if(strcmp(peer, "Broadcast") == 0) {
-			mode = BROADCAST;
-			sprintf(indicator, "you");
-			printf("%d Set broadcast mode, indicator = %s\n", mode, indicator);
-			sprintf(text, "Broadcast mode activated\n");
-		} else {
-			mode = PTOP;
-			sprintf(indicator, "you to %s", peer);
-			printf("%d Set p2p mode with %s, indicator = %s\n", mode, peer, indicator);
-			sprintf(text, "Peer_to_peer mode with %s activated\n", peer);
-		}
-
+		gtk_tree_model_get(model, &iter, LIST_ITEM, &selected_card,  -1);
+		gtk_label_set_text(GTK_LABEL(label), selected_card);
+		sprintf(text, "New card selected: %s\n", selected_card);
+		printf("%s", text);
 		display_message(text, view, "red_fg");
 	}
 }
@@ -173,51 +197,14 @@ void send_message(char *message) {
  */
 static void entry_activate_cb (GtkEntry *entry, GtkWidget *view)
 {
-	char tag[BUFSIZE];
     char text[BUFSIZE];
     char message[BUFSIZE];
     
-    sprintf(text, "%s: %s\n", indicator, gtk_entry_get_text(entry));
-    
-    if(mode == BROADCAST) {
-    	if(conf == IN_CONF) {
-    		sprintf(message, "%d %s %s", mode, n, gtk_entry_get_text(entry));
-    		sprintf(tag, "normal");
-    		send_message(message);
-    	} else {
-    		sprintf(text, "You are outside the conference, you cannot broadcasts messages.\nPlease select a client before sending your message.\n");
-    		sprintf(tag, "bold");
-    	}
-    } else {
-    	sprintf(message, "%d %s %s %s", mode, n, peer, gtk_entry_get_text(entry));
-    	sprintf(tag, "blue_fg");
-    	send_message(message);
-    }
-
-	display_message(text, view, tag);
+    sprintf(text, "You: %s\n", gtk_entry_get_text(entry));
+    sprintf(message, "%d %s %s", BROADCAST, n, gtk_entry_get_text(entry));
+	send_message(message);
+	display_message(text, view, "blue_fg");
     gtk_entry_set_text (entry, "");
-}
-
-/*
- * Signal handler for the "active" signal of the Switch
- * Used tutorial to create this from: https://developer.gnome.org/
- */
-static void activate_cb (GObject *switcher, GParamSpec *pspec, gpointer user_data)
-{
-	char buf[BUFSIZE];
-
-	if (gtk_switch_get_active (GTK_SWITCH (switcher))) {
-		sprintf(buf, "%d %s", JOIN, n);
-		conf = IN_CONF;
-		display_message("Joining conference\n", view, "red_fg");
-	} else {
-		sprintf(buf, "%d %s", LEAVE, n);
-		conf = OUT_CONF;
-		display_message("Leaving conference\n", view, "red_fg");
-	}
-
-	// Notifies the server
-	send_message(buf);
 }
 
 /*
@@ -231,44 +218,47 @@ static GtkWidget* create_window(void)
 	GtkWidget *window;
 	GtkWidget *scroll;
 	GtkWidget *entry;
-	GtkWidget *label;
 	GtkWidget *label_list;
-	GtkWidget *switcher;
-	GtkWidget *box;
-	GtkWidget *box_message;
-	GtkWidget *box_switch;
-	GtkWidget *box_list;
+	GtkWidget *button;
 	GtkWidget *box_window;
+	GtkWidget *box_game;
+	GtkWidget *box_list;
+	GtkWidget *box_players;
+	GtkWidget *box_message;
+	
 	GtkTreeSelection *selection;
 	GtkTextIter iter;
 	GtkTextBuffer *buffer;
+	buffer = gtk_text_buffer_new(NULL);
 
 	/* Create a window with a title, and a default size */
 	window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-	gtk_window_set_title(GTK_WINDOW (window), "Messenger");
+	gtk_window_set_title(GTK_WINDOW (window), "Hearts");
 	gtk_window_set_default_size(GTK_WINDOW (window), 660, 600);
 	g_signal_connect(window, "delete-event", G_CALLBACK (gtk_main_quit), NULL);
 	
 	/* Create the boxes */
-	box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
-	box_message = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
-	box_switch = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
-	box_list = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 	box_window = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
+	box_game = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+	box_list = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+	box_players = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
+	box_message = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 	
 	/* Create the list */
 	list = gtk_tree_view_new();
 	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(list), FALSE);
 	
 	/*Create a label*/
-	label = gtk_label_new("Conference Mode:");
-	label_list = gtk_label_new("");
-	label_users = gtk_label_new("");
+	label_list = gtk_label_new("No cards");
+	label_users = gtk_label_new(n);
+	label_player_one = gtk_label_new("Player");
+	label_player_two = gtk_label_new("Player");
+	label_player_three = gtk_label_new("Player");
 	gtk_label_set_justify(GTK_LABEL(label_list), GTK_JUSTIFY_CENTER);
-	
-	/*Create a switch with a default active state*/
-	switcher = gtk_switch_new();
-	gtk_switch_set_active(GTK_SWITCH (switcher), TRUE);
+	gtk_label_set_justify(GTK_LABEL(label_users), GTK_JUSTIFY_CENTER);
+	gtk_label_set_justify(GTK_LABEL(label_player_one), GTK_JUSTIFY_CENTER);
+	gtk_label_set_justify(GTK_LABEL(label_player_two), GTK_JUSTIFY_CENTER);
+	gtk_label_set_justify(GTK_LABEL(label_player_three), GTK_JUSTIFY_CENTER);
 	
 	/* Create a new entry */
 	entry = gtk_entry_new();
@@ -278,7 +268,6 @@ static GtkWidget* create_window(void)
 	g_object_set (scroll, "shadow-type", GTK_SHADOW_IN, NULL);
 
 	/* Create the view to print the messages */
-	view = gtk_text_view_new();
 	buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
 	gtk_container_add(GTK_CONTAINER (scroll), view);
 	gtk_text_buffer_get_iter_at_offset(buffer, &iter, 0);
@@ -291,25 +280,24 @@ static GtkWidget* create_window(void)
 	gtk_text_buffer_create_tag(buffer, "red_fg", "foreground", "red", NULL);
 
 	/* Add a new message */
-	gtk_text_buffer_insert_with_tags_by_name (buffer, &iter, "You are connected in Broadcast mode\n", -1, "bold", "lmarg",  NULL);
+	gtk_text_buffer_insert_with_tags_by_name (buffer, &iter, "You are connected\n", -1, "bold", "lmarg",  NULL);
 
-	/* Hook the entry to the view */
-	g_signal_connect (entry, "activate", G_CALLBACK (entry_activate_cb), view);
-	
-	/*Connecting the clicked signal to the callback function*/
-	g_signal_connect (GTK_SWITCH (switcher), "notify::active", G_CALLBACK (activate_cb), window);
+	/* Create a button */
+	button = gtk_button_new_with_label ("Play a card");
 
 	/* Add the widgets to the boxes */
-	gtk_box_pack_start(GTK_BOX (box_switch), label, TRUE, TRUE, 5);
-	gtk_box_pack_start(GTK_BOX (box_switch), switcher, FALSE, FALSE, 5);
-	gtk_box_pack_start(GTK_BOX (box), box_switch, FALSE, FALSE, 5);
-	gtk_box_pack_start(GTK_BOX (box), scroll, TRUE, TRUE, 5);
-	gtk_box_pack_start(GTK_BOX (box_message), entry, TRUE, TRUE, 5);
-	gtk_box_pack_start(GTK_BOX (box), box_message, FALSE, FALSE, 5);
+	gtk_box_pack_start(GTK_BOX (box_players), label_player_one, FALSE, FALSE, 5);
+	gtk_box_pack_start(GTK_BOX (box_players), label_player_two, TRUE, TRUE, 5);
+	gtk_box_pack_start(GTK_BOX (box_players), label_player_three, FALSE, FALSE, 5);
+	gtk_box_pack_start(GTK_BOX (box_game), box_players, FALSE, FALSE, 5);	
+	gtk_box_pack_start(GTK_BOX (box_message), scroll, TRUE, TRUE, 5);
+	gtk_box_pack_start(GTK_BOX (box_message), entry, FALSE, FALSE, 5);
+	gtk_box_pack_start(GTK_BOX (box_game), box_message, TRUE, TRUE, 5);
+	gtk_box_pack_start(GTK_BOX (box_window), box_game, TRUE, TRUE, 5);
 	gtk_box_pack_start(GTK_BOX (box_list), label_users, FALSE, FALSE, 5);
 	gtk_box_pack_start(GTK_BOX (box_list), list, TRUE, TRUE, 5);
 	gtk_box_pack_start(GTK_BOX (box_list), label_list, FALSE, FALSE, 5);
-	gtk_box_pack_start(GTK_BOX (box_window), box, TRUE, TRUE, 5);
+	gtk_box_pack_start(GTK_BOX (box_list), button, FALSE, FALSE, 5);
 	gtk_box_pack_start(GTK_BOX (box_window), box_list, FALSE, FALSE, 5);
 	
 	/* Add the grid to the window */
@@ -317,13 +305,22 @@ static GtkWidget* create_window(void)
 	
 	/* Initialize the list */
 	init_list(list);
-	set_list_peers();
+	add_to_list("No cards");
+
+	/* Initialize the players */
+	set_players();
 	
 	/* Create the tree */
 	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(list));
 	
 	/* Hook the selection of en item of the list */
 	g_signal_connect(selection, "changed", G_CALLBACK(on_changed), label_list);
+
+	/* Hook the entry to the view */
+	g_signal_connect (entry, "activate", G_CALLBACK (entry_activate_cb), view);
+
+	/*Connecting the clicked signal to the callback function*/
+	g_signal_connect (GTK_BUTTON (button), "clicked", G_CALLBACK (button_clicked), G_OBJECT (window));
 
 	/* Show the window */
 	gtk_widget_show_all(GTK_WIDGET (box_window));
@@ -339,7 +336,7 @@ void *receive_thread(void *data_thread) {
 	
 	// Pointer to functions
 	funcptr *functions = malloc(sizeof(funcptr) * ACTIONS);
-	functions[0] = &peer_to_peer;
+	functions[0] = &play_card;
 	functions[1] = &broadcast;
 	functions[2] = &add_user;
 	functions[3] = &remove_user;
@@ -385,55 +382,60 @@ void *receive_thread(void *data_thread) {
 }
 
 /*
- * Adds the connected users to the list
+ * Adds the connected players
  */
-void set_list_peers() {
+void set_players() {
 	int i;
-	char value[BUFSIZE];
 	
 	// Set all the values
 	next_char[0] = 0;
-	number_users = parse_int(users, next_char) + 1;
-	
-	// Set the label
-	sprintf(value, "Connected users: %d", number_users);
-	gtk_label_set_text(GTK_LABEL(label_users), value);
-	
-	// Set the list
-	add_to_list("Broadcast");
-	i = 1;
-	while(i != number_users) {
-		value[0] = '\0';
-		parse_name(users, value, next_char);
-		printf("names %s\n", value);
-		add_to_list(value);
-		++i;
+	player_number = parse_int(users, next_char);
+
+	// Set the labels
+	for(i = 0	; i < player_number; ++i) {
+		add_user(users);
 	}
 }
 
 /*
- * Adds the user to the list of users
+ * Sets the player name
  */
 void add_user(char *message) {
 	char value[BUFSIZE];
 	char text[BUFSIZE];
 
-	parse_name(message, value, next_char);
-	printf("New user: %s\n", value);
-
-	// Print a message
-	sprintf(text, "%s connected\n", value);
-	display_message(text, view, "red_fg");
-	
-	// Add the new user
-	add_to_list(value);
-	
 	// Increase number of users
 	++number_users;
-	
-	// Set the label
-	sprintf(value, "Connected users: %d", number_users);
-	gtk_label_set_text(GTK_LABEL(label_users), value);
+
+	// Parses the name
+	parse_name(message, value, next_char);
+	printf("New player %d: %s\n", number_users, value);
+
+	// Print a message
+	if(number_users < MAXUSERS) {
+		sprintf(text, "%s connected, waiting for more players\n", value);
+	} else {
+		sprintf(text, "%s connected, enough players connected\nThe game can start!\n", value);
+	}
+	display_message(text, view, "bold");
+
+	// Add the new user
+	switch(number_users) {
+		case 2:
+			gtk_label_set_text(GTK_LABEL(label_player_one), value);
+			break;
+		case 3:
+			gtk_label_set_text(GTK_LABEL(label_player_two), value);			
+			break;
+		case 4:
+			gtk_label_set_text(GTK_LABEL(label_player_three), value);
+			break;
+	}
+
+	// Change the state if all the players are connected
+	if(number_users == MAXUSERS) {
+		state = GIVE_CARDS;
+	}
 }
 
 /*
@@ -441,41 +443,37 @@ void add_user(char *message) {
  * From: http://zetcode.com/tutorials/gtktutorial/gtktreeview/
  */
 void remove_user(char *message) {
-	GtkListStore *store;
-	GtkTreeModel *model;
-	GtkTreeIter iter;
-	char *value;
 	char name[BUFSIZE];
+	char p[SIZENAME];
 	char text[BUFSIZE];
-	gboolean isvalid;
 
 	// Get the user name
 	parse_name(message, name, next_char);
 	printf("Remove user: %s\n", name);
+	// Print a message
+	sprintf(text, "%s disconnected\n", name);
+	display_message(text, view, "bold");
 
-	// Get the list
-	store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW (list)));
-	model = gtk_tree_view_get_model (GTK_TREE_VIEW (list));
-
-	// Get the first element
-	isvalid = gtk_tree_model_get_iter_first(model, &iter);
-		
-	// Searching the user
-	while(isvalid) {
-		// Get the name of the user
-		gtk_tree_model_get(model, &iter, LIST_ITEM, &value,  -1);
-		
-		if(strcmp(name, value) == 0) {
-			// Remove the user
-			gtk_list_store_remove(store, &iter);
-			sprintf(text, "%s disconnected\n", name);
-			display_message(text, view, "red_fg");
-			return;
-		}
-		
-		// Get the next user
-		isvalid = gtk_tree_model_iter_next(model, &iter);
+	// Get the users
+	sprintf(p, "%s", gtk_label_get_text(GTK_LABEL(label_player_one)));
+	if(strcmp(p, name) == 0) {
+		gtk_label_set_text(GTK_LABEL(label_player_one), gtk_label_get_text(GTK_LABEL(label_player_two)));
+		gtk_label_set_text(GTK_LABEL(label_player_two), gtk_label_get_text(GTK_LABEL(label_player_three)));
+		return;
 	}
+	sprintf(p, "%s", gtk_label_get_text(GTK_LABEL(label_player_two)));
+	if(strcmp(p, name) == 0) {
+		gtk_label_set_text(GTK_LABEL(label_player_two), gtk_label_get_text(GTK_LABEL(label_player_three)));
+		return;
+	}
+	sprintf(p, "%s", gtk_label_get_text(GTK_LABEL(label_player_three)));
+	if(strcmp(p, name) == 0) {
+		gtk_label_set_text(GTK_LABEL(label_player_three), "Player");
+		return;
+	}
+
+	// Decreases the number of users
+	--number_users;
 }
 
 /*
@@ -488,21 +486,83 @@ void broadcast(char *message) {
    	parse_name(message, name, next_char);
    	sprintf(text, "%s: %s\n", name, consume(message, next_char));
    	
-   	display_message(text, view, "normal");
+   	display_message(text, view, "blue_fg");
+}
+
+void remove_card(char *c) {
+	GtkListStore *store;
+	GtkTreeModel *model;
+	GtkTreeIter iter;
+	char *value;
+	gboolean isvalid;
+
+	// Get the list
+	store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW (list)));
+	model = gtk_tree_view_get_model (GTK_TREE_VIEW (list));
+
+	// Get the first element
+	isvalid = gtk_tree_model_get_iter_first(model, &iter);
+		
+	// Searching the card
+	while(isvalid) {
+		// Get the value of the card
+		gtk_tree_model_get(model, &iter, LIST_ITEM, &value,  -1);
+		
+		if(strcmp(c, value) == 0) {
+			// Remove the card
+			gtk_list_store_remove(store, &iter);
+			return;
+		}
+		
+		// Get the next card
+		isvalid = gtk_tree_model_iter_next(model, &iter);
+	}
 }
 
 /*
- * Receives a message in p2p mode
+ *
  */
-void peer_to_peer(char *message) {
-    char text[BUFSIZE];
-   	char name[SIZENAME];
-   	
-   	parse_name(message, name, next_char);
-   	parse_name(message, text, next_char);
-   	sprintf(text, "%s to you: %s\n", name, consume(message, next_char));
-   	
-   	display_message(text, view, "blue_fg");
+void play_card(char *message) {
+	//int suit, set;
+	int player;
+	char buf[BUFSIZE];
+	char c[BUFSIZE];
+		
+	if(state == GIVE_CARDS) {
+		//suit = parse_int(message, next_char);
+		//set = parse_int(message, next_char);
+		add_to_list(consume(message, next_char));
+		++cards;
+		if(cards == MAX_SET) {
+			state = EXCHANGE;
+			play = PLAY;
+			//sprintf(buf, "Choose 3 cards to send to an opponent\n");
+			//display_message(buf, view, "red_fg");
+			cards = 0;
+		}
+		return;
+	}
+
+	if(state == EXCHANGE) {
+		if(play == PLAY) {
+			player = parse_int(message, next_char);
+			sprintf(c, "%s", consume(message, next_char));
+			sprintf(buf, "You choose: %s\n", c);
+			remove_card(c);
+			display_message(buf, view, "normal");
+			++cards;
+			if(cards == 3) {
+				play = WAIT;
+				cards = 0;
+			}
+		} else {
+			sprintf(c, "%s", consume(message, next_char));
+			add_to_list(c);
+			sprintf(buf, "Received: %s\n", c);
+			display_message(buf, view, "normal");
+		}
+		return;
+	}
 }
 
 /*
@@ -510,14 +570,16 @@ void peer_to_peer(char *message) {
  */
 int main(int argc, char **argv) {
 	GtkWidget *window;
+	int recvlen, rc;
 	pthread_attr_t attr;
 	void *status;
 	pthread_t receiver;
-	int rc, recvlen;
+
 	n = malloc(sizeof(char) * SIZENAME);
 	char *buf = malloc(sizeof(char) * BUFSIZE);
 	next_char = malloc(sizeof(int));
-	
+	selected_card = malloc(sizeof(char *));
+
 	// Set client's name
 	if(argc > 0) {
 		n = argv[1];
@@ -525,39 +587,73 @@ int main(int argc, char **argv) {
 		printf("Enter your name: ");
 		scanf("%s", n);
 	}
-	
+
 	while(strlen(n) > SIZENAME - 1) {
 		printf("WARNING - Your name must be under %d characters\nPlease, enter a new one: ", (SIZENAME - 1));
 		scanf("%s", n);
 	}
-	
-	// Set the flags
-	loop = 0;
-	conf = IN_CONF;
-	mode = BROADCAST;
-	
-	// Set the indicator to its initial value
-	indicator = malloc(sizeof(char*));
-	sprintf(indicator, "you");
-	
+
 	// Set lenght of an address
     len = sizeof(Address);
 	
 	// Set the address to the server
 	memset((char *)&addr, 0, len);
 	addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(PORT);
-    
-    // create a UDP socket
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr.sin_port = htons(PORT);
+
+	// create a UDP socket
 	if ((cs = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		perror("cannot create socket\n");
 		return -1;
 	}
-    
+
+	// Sends our name to the server
+	sprintf(buf, "%d %s", CONNECT, n);
+	printf("Sending: %s\n", buf);
+	if (sendto(cs, buf, strlen(buf), 0, (struct sockaddr *)&addr, len) < 0) {
+		perror("ERROR - sendto failed");
+		free(n);
+		free(buf);
+		free(next_char);
+		return -1;
+	}
+
+	// Get the list of connected users
+	users = malloc(sizeof(char) * BUFSIZE);
+	recvlen = recvfrom(cs, users, BUFSIZE, 0, (struct sockaddr *)&addr, &len);
+
+	if (recvlen > 0) {
+		// Add End caracter to the message
+		users[recvlen] = '\0';
+		printf("Received: \"%s\"\n", users);
+		// Stops the execution if the server is full.
+		if(strcmp(users, "Server is full") == 0) {
+			printf("You cannot play at the moment, the server is full.\n");
+			return 0;
+		}
+	}
+		
+	// Set the flags
+	loop = 0;
+	play = WAIT;
+	state = WAITING;
+	number_users = 1;
+	cards = 0;
+	sprintf(selected_card, "No cards");
+
 	// Initialize Mutex
 	pthread_mutex_init(&mutex, NULL);
+
+	// Initialise GTK
+	gtk_init(&argc, &argv);
+
+	// Create the window
+	view = gtk_text_view_new();
+	window = create_window();
 	
+	gtk_widget_show(window);
+
 	// Initialize and set thread detached attribute
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -568,46 +664,15 @@ int main(int argc, char **argv) {
 	data_thread.addrlen = len;
 	data_thread.name = n;
 
-	// Sends our name to the server
-	sprintf(buf, "%d %s", CONNECT, n);
-	
-	printf("Sending: %s\n", buf);
-	if (sendto(cs, buf, strlen(buf), 0, (struct sockaddr *)&addr, len) < 0) {
-		perror("ERROR - sendto failed");
-		free(n);
-		free(buf);
-		return -1;
-	}
-	
-	// Get the list of connected users
-	users = malloc(sizeof(char) * BUFSIZE);
-	recvlen = recvfrom(cs, users, BUFSIZE, 0, (struct sockaddr *)&addr, &len);
-
-	if (recvlen > 0) {
-		// Add End caracter to the message
-		users[recvlen] = '\0';
-		printf("Received: \"%s\"\n", users);
-	}
-
 	// Set the threads
 	rc = pthread_create(&receiver, &attr, receive_thread, (void *) &data_thread);
 	if (rc){
-		sprintf(n, "ERROR %d - Cannot create receiver thread\n", rc); 
-		perror(n);
-		free(n);
+		printf("ERROR %d - Cannot create receiver thread\n", rc); 
 		return -1;
 	}
-	
-	// Initialise GTK
-	gtk_init(&argc, &argv);
-
-	// Create the window
-	window = create_window();
-	
-	gtk_widget_show(window);
 
 	gtk_main();
-	
+
 	// User as closed the window we indicating we want to finish the execution
 	loop = 1;
 	
@@ -624,15 +689,14 @@ int main(int argc, char **argv) {
 	
 	rc = pthread_join(receiver, &status);
 	if (rc) {
-		sprintf(n, "ERROR %d - Cannot join receiver thread\n", rc); 
-		perror(n);
+		printf("ERROR %d - Cannot join receiver thread\n", rc); 
 		return -1;
 	}
-	
+
 	pthread_mutex_destroy(&mutex);
+
 	close(cs);
 	free(buf);
-	free(indicator);
 	free(next_char);
 	return 0;
 }

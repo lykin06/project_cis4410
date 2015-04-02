@@ -2,7 +2,7 @@
 #define SERVER_H_
 
 // Number of possible actions
-#define ACTIONS 6
+#define ACTIONS 4
 
 #include <netinet/in.h>
 
@@ -19,12 +19,30 @@ struct User_t {
 	// User's address
 	Address addr;
 	
-	// Flag indicating he is in conference mode
-	int conf;
+	// Number of points
+	int points;
 };
 
 // Function pointer
 typedef void (*funcptr)(char *message, Address remaddr);
+
+/*
+ * Sends a message to a player
+ */
+void send_message(char *message, Address address);
+
+/*
+ * Initialize the server
+ * Sets the deck of cards to be a 52 French Card Deck
+ */
+void init_server();
+
+/*
+ * Waiting for players loop
+ * Stops when there are 4 players
+ * Previous players can leave
+ */
+void wait_for_players();
 
 /*
  * Returns the id of the given username
@@ -33,7 +51,8 @@ typedef void (*funcptr)(char *message, Address remaddr);
 int get_userid(char *name);
 
 /*
- * Adds the user to the list of users
+ * Adds the user to the list of users if there is less than MAXUSERS users
+ * Notifies the other players.
  */
 void add_user(char *message, Address remaddr);
 
@@ -50,7 +69,7 @@ void broadcast(char *message, Address remaddr);
 /*
  * Sends the message to one user
  */
-void peer_to_peer(char *message, Address remaddr);
+void play_game(char *message, Address remaddr);
 
 /*
  * Holds the main loop of the program
@@ -62,5 +81,16 @@ void server();
  * Free the global variables
  */
 void free_vars();
+
+/*
+ * Shuffles the deck of cards
+ * Iterates over the deck and swift cards
+ */
+ void shuffle_cards();
+
+ /*
+ * Gives the three cards from a player to another
+ */
+void exchange_cards();
 
 #endif // SERVER_H_
