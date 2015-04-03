@@ -122,3 +122,10 @@ int set_int(char *name) {
 
 	return -1;
 }
+
+/*
+ * Returns the value of the card
+ */
+int card_value(int suit, int set) {
+	return ((suit * MAX_SET) + set);
+}

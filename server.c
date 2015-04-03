@@ -46,6 +46,10 @@ Card three[3];
 int pfour;
 Card four[3];
 
+// Buffer including card played
+Card played[4];
+int pcard;
+
 // Pointer to functions
 funcptr *functions;
 
@@ -73,10 +77,6 @@ void send_message(char *message, Address address) {
  * Sets the deck of cards to be a 52 French Card Deck
  */
 void init_server() {
-	int suit;
-	int set;
-	int card = 0;
-
 	// Set number of players
 	number_users = 0;
 
@@ -88,14 +88,7 @@ void init_server() {
 	functions[3] = &disconnect;
 
 	// Initialize the deck of cards
-	for(suit = 0; suit < MAX_SUIT; ++suit) {
-		for(set = 0; set < MAX_SET; ++set) {
-			deck[card].set = set;
-			deck[card].suit = suit;
-			deck[card].player = 0;
-			++card;
-		}
-	}
+	reset_cards();
 
 	// Sets the state of the server
 	state = WAITING;
@@ -294,10 +287,13 @@ void play_game(char *message, Address remaddr) {
 		send_message(message, users[p].addr);
 		if((pone == 3) && (ptwo == 3) && (pthree == 3) && (pfour == 3)) {
 			exchange_cards();
-			state = HAND;
 		}
 
 		return;
+	}
+
+	if(state == HAND) {
+
 	}
 }
 
@@ -335,6 +331,22 @@ int check_action(int action) {
 }
 
 /*
+ * Resets the cards position
+ */
+void reset_cards() {
+	int suit, set, card = 0;
+	
+	for(suit = 0; suit < MAX_SUIT; ++suit) {
+		for(set = 0; set < MAX_SET; ++set) {
+			deck[card].set = set;
+			deck[card].suit = suit;
+			deck[card].player = -1;
+			++card;
+		}
+	}
+}
+
+/*
  * Shuffles the deck of cards
  * Iterates over the deck and swift cards
  */
@@ -344,7 +356,7 @@ void shuffle_cards() {
 
 	for(i = 0; i < NUMBER_OF_CARDS; ++i) {
 		// Reset the player
-		deck[i].player = 0;
+		deck[i].player = -1;
 		tmp.suit = deck[i].suit;
 		tmp.set = deck[i].set;
 		j = my_rand(0, NUMBER_OF_CARDS);
@@ -368,6 +380,12 @@ void give_cards() {
 			deck[card].player = i;
 			sprintf(message, "%d %d %d ", GAME, deck[card].suit, deck[card].set);
 			send_message(message, users[j].addr);
+
+			// Sets the first player
+			if(card_value(deck[card].suit, deck[card].set) == SPADES_QUEEN) {
+				turn = j;
+			}
+
 			++card;
 		}
 	}
@@ -375,6 +393,8 @@ void give_cards() {
 
 /*
  * Gives the three cards from a player to another
+ *
+ * TODO Refractoring
  */
 void exchange_cards() {
 	int i, j;
@@ -394,6 +414,9 @@ void exchange_cards() {
 				break;
 		}
 		send_message(buf, users[j].addr);
+		if(card_value(one[i].suit, one[i].set) == SPADES_QUEEN) {
+			turn = j;
+		}
 		sprintf(buf, "%d %d %d ", GAME, two[i].suit, two[i].set);
 		switch(exchange) {
 			case LEFT:
@@ -407,6 +430,9 @@ void exchange_cards() {
 				break;
 		}
 		send_message(buf, users[j].addr);
+		if(card_value(two[i].suit, two[i].set) == SPADES_QUEEN) {
+			turn = j;
+		}
 		sprintf(buf, "%d %d %d ", GAME, three[i].suit, three[i].set);
 		switch(exchange) {
 			case LEFT:
@@ -420,6 +446,9 @@ void exchange_cards() {
 				break;
 		}
 		send_message(buf, users[j].addr);
+		if(card_value(three[i].suit, three[i].set) == SPADES_QUEEN) {
+			turn = j;
+		}
 		sprintf(buf, "%d %d %d ", GAME, four[i].suit, four[i].set);
 		switch(exchange) {
 			case LEFT:
@@ -433,6 +462,9 @@ void exchange_cards() {
 				break;
 		}
 		send_message(buf, users[j].addr);
+		if(card_value(four[i].suit, four[i].set) == SPADES_QUEEN) {
+			turn = j;
+		}
 	}
 
 	if(exchange == RIGHT) {
@@ -440,6 +472,15 @@ void exchange_cards() {
 	} else {
 		++exchange;
 	}
+
+	// Changes state
+	state = HAND;
+
+	// Notifies the first player
+	send_message("0 play", users[turn].addr);
+
+	// Sets the pointer buffer
+	pcard = 0;
 }
 
 /*
@@ -468,6 +509,7 @@ void server() {
 		if(state == GIVE_CARDS) {
 			shuffle_cards();
 			give_cards();
+			reset_cards();
 			state = EXCHANGE;
 		}
 

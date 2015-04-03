@@ -83,6 +83,11 @@ void server();
 void free_vars();
 
 /*
+ * Resets the cards position
+ */
+void reset_cards();
+
+/*
  * Shuffles the deck of cards
  * Iterates over the deck and swift cards
  */

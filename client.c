@@ -576,6 +576,13 @@ void play_card(char *message) {
 		}
 		return;
 	}
+
+	if(state == HAND) {
+		if(strcmp(consume(message, next_char), "play") == 0) {
+			play = PLAY;
+			display_message("It is your turn, please choose a card\n", view, "bold");
+		}
+	}
 }
 
 /*

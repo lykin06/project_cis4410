@@ -6,6 +6,7 @@
 #define NUMBER_OF_CARDS 52
 #define MAX_SET 13
 #define MAX_SUIT 4
+#define SPADES_QUEEN 11
 
 typedef struct card_t
 {
@@ -33,5 +34,10 @@ char *set_string(int set);
  * Returns the value of the given set name
  */
 int set_int(char *name);
+
+/*
+ * Returns the value of the card
+ */
+int card_value(int suit, int set);
 
 #endif // CARDS_H_
