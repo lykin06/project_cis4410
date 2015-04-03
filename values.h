@@ -23,6 +23,7 @@
 #define GIVE_CARDS		1
 #define EXCHANGE		2
 #define HAND			3
+#define PAUSE			4
 
 // Different exchange
 #define LEFT	0

@@ -44,7 +44,7 @@ GtkWidget *view;
 // Number of connected users
 int number_users;
 
-// Number of cards
+// Number of cards played
 int cards;
 
 // Player number
@@ -71,6 +71,13 @@ enum
 
 // State of the game
 int state;
+
+// Flags indicating the rules
+int hearts;
+int current_suit;
+
+// State of the player hands
+int hand[MAX_SUIT];
 
 /* 
  * Displays a plain text message into the text view
@@ -105,21 +112,33 @@ static void button_clicked(GtkButton *button, gpointer user_data)
 		printf("%s", buf);
 		display_message(buf, view, "red_fg");
 	} else {
-		if(state == EXCHANGE) {
-			if(strcmp(selected_card, "No cards") != 0) {
-				nc = malloc(sizeof(int));
-				nc[0] = 0;
-				parse_name(selected_card, buf, nc);
-				suit = suit_int(buf);
-				parse_name(selected_card, buf, nc);
-				set = set_int(buf);
-				sprintf(buf, "%d %d %d %d ", GAME, player_number, suit, set);
-				send_message(buf);
-				sprintf(selected_card, "No cards");
-			} else {
-				display_message("No card selected\n", view, "red_fg");
+		if(strcmp(selected_card, "No cards") != 0) {
+			nc = malloc(sizeof(int));
+			nc[0] = 0;
+			parse_name(selected_card, buf, nc);
+			suit = suit_int(buf);
+			parse_name(selected_card, buf, nc);
+			set = set_int(buf);
+			sprintf(buf, "%d %d %d %d ", GAME, player_number, suit, set);
+			sprintf(selected_card, "No cards");
+		} else {
+			display_message("No card selected\n", view, "red_fg");
+			return;
+		}
+
+		if(state == HAND) {
+			if((current_suit != -1) && (suit != current_suit)) {
+				display_message("You cannot play this card!\n", view, "red_fg");
+				return;
+			}
+
+			if((suit == HEARTS) && (hearts == 0) && (current_suit == -1)) {
+				display_message("You cannot play hearts!\n", view, "red_fg");
+				return;
 			}
 		}
+
+		send_message(buf);
 	}
 }
 
@@ -531,8 +550,7 @@ void remove_card(char *c) {
  *
  */
 void play_card(char *message) {
-	int suit, set;
-	int player;
+	int suit, set, player, turn;
 	char buf[BUFSIZE];
 	char c[BUFSIZE];
 		
@@ -541,6 +559,7 @@ void play_card(char *message) {
 		set = parse_int(message, next_char);
 		sprintf(c, "%s %s", suit_string(suit), set_string(set));
 		add_to_list(c);
+		++hand[suit];
 		++cards;
 		if(cards == MAX_SET) {
 			state = EXCHANGE;
@@ -560,6 +579,7 @@ void play_card(char *message) {
 			sprintf(c, "%s %s", suit_string(suit), set_string(set));
 			sprintf(buf, "You choosed: %s\n", c);
 			remove_card(c);
+			--hand[suit];
 			display_message(buf, view, "normal");
 			++cards;
 			if(cards == 3) {
@@ -572,15 +592,60 @@ void play_card(char *message) {
 			sprintf(c, "%s %s", suit_string(suit), set_string(set));
 			sprintf(buf, "You received: %s\n", c);
 			add_to_list(c);
+			++hand[suit];
 			display_message(buf, view, "normal");
 		}
 		return;
 	}
 
 	if(state == HAND) {
+		// Round
+		turn = parse_int(message, next_char);
+
+		// Receives notifications
 		if(strcmp(consume(message, next_char), "play") == 0) {
 			play = PLAY;
+			if(turn == player_number) {
+				current_suit = -1;
+			}
 			display_message("It is your turn, please choose a card\n", view, "bold");
+		} else {
+			player = parse_int(message, next_char);
+			suit = parse_int(message, next_char);
+			set = parse_int(message, next_char);
+
+			sprintf(c, "%s %s", suit_string(suit), set_string(set));
+
+			if(player == player_number) {
+				sprintf(buf, "You played: %s\n", c);
+				remove_card(c);
+				--hand[suit];
+				--cards;
+			} else {
+				sprintf(buf, "Player %d played: %s\n", player, c);
+			}
+
+			// Actual suit
+			if(turn == 0) {
+				if(hand[suit] == 0) {
+					// We can play other cards
+					current_suit = -1;
+				} else {
+					current_suit = suit;
+				}
+			} else if(turn == 3) {
+				// Checks last round
+				if(cards == 0) {
+					state = PAUSE;
+				}
+			}
+
+			// Someone played hearts
+			if(suit == HEARTS) {
+				++hearts;
+			}
+
+			display_message(buf, view, "normal");
 		}
 	}
 }
@@ -590,7 +655,7 @@ void play_card(char *message) {
  */
 int main(int argc, char **argv) {
 	GtkWidget *window;
-	int recvlen, rc;
+	int recvlen, rc, i;
 	pthread_attr_t attr;
 	void *status;
 	pthread_t receiver;
@@ -661,6 +726,11 @@ int main(int argc, char **argv) {
 	number_users = 1;
 	cards = 0;
 	sprintf(selected_card, "No cards");
+	hearts = 0;
+	current_suit = -1;
+	for(i = 0; i < MAX_SUIT; ++i) {
+		hand[i] = 0;
+	}
 
 	// Initialize Mutex
 	pthread_mutex_init(&mutex, NULL);

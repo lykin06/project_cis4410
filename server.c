@@ -293,7 +293,25 @@ void play_game(char *message, Address remaddr) {
 	}
 
 	if(state == HAND) {
+		// Receives a card played
 
+		// Sends the card to the other players
+
+		// Checks if all the players has played
+			// Checks who won the round
+
+			// Calculates the points
+
+			// Notifies players
+
+			// Restarts a round
+
+		// Checks if all the rounds have been played
+			// Compares the points
+
+			// Notifies the players
+
+			// Changes state to PAUSE
 	}
 }
 
@@ -477,7 +495,8 @@ void exchange_cards() {
 	state = HAND;
 
 	// Notifies the first player
-	send_message("0 play", users[turn].addr);
+	sprintf(buf, "%d %d play", GAME, turn);
+	send_message(buf, users[turn].addr);
 
 	// Sets the pointer buffer
 	pcard = 0;
