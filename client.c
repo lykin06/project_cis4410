@@ -96,6 +96,8 @@ static void display_message(char *message, GtkWidget *view, char *tag) {
  */
 static void button_clicked(GtkButton *button, gpointer user_data)
 {
+	int suit, set;
+	int *nc;
 	char buf[BUFSIZE];
 
 	if(play == WAIT) {
@@ -105,7 +107,13 @@ static void button_clicked(GtkButton *button, gpointer user_data)
 	} else {
 		if(state == EXCHANGE) {
 			if(strcmp(selected_card, "No cards") != 0) {
-				sprintf(buf, "%d %d %s ", GAME, player_number, selected_card);
+				nc = malloc(sizeof(int));
+				nc[0] = 0;
+				parse_name(selected_card, buf, nc);
+				suit = suit_int(buf);
+				parse_name(selected_card, buf, nc);
+				set = set_int(buf);
+				sprintf(buf, "%d %d %d %d ", GAME, player_number, suit, set);
 				send_message(buf);
 				sprintf(selected_card, "No cards");
 			} else {
@@ -523,15 +531,16 @@ void remove_card(char *c) {
  *
  */
 void play_card(char *message) {
-	//int suit, set;
+	int suit, set;
 	int player;
 	char buf[BUFSIZE];
 	char c[BUFSIZE];
 		
 	if(state == GIVE_CARDS) {
-		//suit = parse_int(message, next_char);
-		//set = parse_int(message, next_char);
-		add_to_list(consume(message, next_char));
+		suit = parse_int(message, next_char);
+		set = parse_int(message, next_char);
+		sprintf(c, "%s %s", suit_string(suit), set_string(set));
+		add_to_list(c);
 		++cards;
 		if(cards == MAX_SET) {
 			state = EXCHANGE;
@@ -546,8 +555,10 @@ void play_card(char *message) {
 	if(state == EXCHANGE) {
 		if(play == PLAY) {
 			player = parse_int(message, next_char);
-			sprintf(c, "%s", consume(message, next_char));
-			sprintf(buf, "You choose: %s\n", c);
+			suit = parse_int(message, next_char);
+			set = parse_int(message, next_char);
+			sprintf(c, "%s %s", suit_string(suit), set_string(set));
+			sprintf(buf, "You choosed: %s\n", c);
 			remove_card(c);
 			display_message(buf, view, "normal");
 			++cards;
@@ -556,9 +567,11 @@ void play_card(char *message) {
 				cards = 0;
 			}
 		} else {
-			sprintf(c, "%s", consume(message, next_char));
+			suit = parse_int(message, next_char);
+			set = parse_int(message, next_char);
+			sprintf(c, "%s %s", suit_string(suit), set_string(set));
+			sprintf(buf, "You received: %s\n", c);
 			add_to_list(c);
-			sprintf(buf, "Received: %s\n", c);
 			display_message(buf, view, "normal");
 		}
 		return;

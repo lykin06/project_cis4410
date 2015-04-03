@@ -14,4 +14,24 @@ typedef struct card_t
 	int player;
 } Card;
 
+/*
+ * Returns the name of the given suit value
+ */
+char *suit_string(int suit);
+
+/*
+ * Returns the value of the given suit name
+ */
+int suit_int(char *name);
+
+/*
+ * Returns the name of the given set value
+ */
+char *set_string(int set);
+
+/*
+ * Returns the value of the given set name
+ */
+int set_int(char *name);
+
 #endif // CARDS_H_
