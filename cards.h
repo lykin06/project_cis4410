@@ -4,9 +4,10 @@
 // Defines the values for a French Card Deck
 
 #define NUMBER_OF_CARDS 52
-#define MAX_SET 13
-#define MAX_SUIT 4
-#define SPADES_QUEEN 11
+#define MAX_SET 		13
+#define MAX_SUIT 		4
+#define SPADES_QUEEN 	11
+#define MOON			26
 
 typedef struct card_t
 {

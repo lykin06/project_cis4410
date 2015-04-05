@@ -21,6 +21,9 @@ struct User_t {
 	
 	// Number of points
 	int points;
+
+	// Score of the player
+	int score;
 };
 
 // Function pointer
@@ -82,6 +85,12 @@ void server();
  */
 void free_vars();
 
+void reset_points();
+
+char *add_points();
+
+int compare_points();
+
 /*
  * Resets the cards position
  */
@@ -97,5 +106,7 @@ void reset_cards();
  * Gives the three cards from a player to another
  */
 void exchange_cards();
+
+int play_round();
 
 #endif // SERVER_H_

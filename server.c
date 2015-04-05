@@ -49,6 +49,7 @@ Card four[3];
 // Buffer including card played
 Card played[4];
 int pcard;
+int round_left;
 
 // Pointer to functions
 funcptr *functions;
@@ -66,6 +67,7 @@ int turn;
  * Sends a message to a player
  */
 void send_message(char *message, Address address) {
+	printf("Server: Sends message \"%s\"\n", message);
 	if (sendto(server_socket, message, strlen(message), 0, (struct sockaddr *)&address, addrlen) < 0) {
 		perror("ERROR - sendto failed");
 		exit(-1);
@@ -89,6 +91,9 @@ void init_server() {
 
 	// Initialize the deck of cards
 	reset_cards();
+
+	// Initialize the points
+	reset_points();
 
 	// Sets the state of the server
 	state = WAITING;
@@ -140,7 +145,6 @@ void add_user(char *message, Address remaddr) {
 				strcat(names, buf);
 
 				// Notifies the player
-				printf("Sending: \"%s\" to %s\n", message, users[i].name);
 				send_message(message, users[i].addr);
 			}
 		} else {
@@ -148,7 +152,6 @@ void add_user(char *message, Address remaddr) {
 		}
 
 		// Sends the list of players to the new client
-		printf("Sending: \"%s\" to new user\n", names);
 		send_message(names, remaddr);
 		
 		// Gets the name of the user
@@ -171,7 +174,6 @@ void add_user(char *message, Address remaddr) {
 	} else {
 		// Sends a "server is full" message to the player
 		sprintf(buf, "Server is full");
-		printf("Sending: \"%s\"\n", buf);
 		send_message(buf, remaddr);
 	}
 }
@@ -235,7 +237,6 @@ void broadcast(char *message, Address remaddr) {
 			for(i = 0; i < number_users; ++i) {
 				printf("loop %d, test %d\n", i, id);
 				if(i != id) {
-					printf("Sending: \"%s\" to %s\n", message, users[i].name);
 					send_message(message, users[i].addr);
 				} else {
 					printf("Sender %s\n", users[id].name);
@@ -255,7 +256,8 @@ void broadcast(char *message, Address remaddr) {
  * Sends the message to one user
  */
 void play_game(char *message, Address remaddr) {
-	int p, suit, set;
+	int p, suit, set, i, moon;
+	char buf[BUFSIZE];
 
 	if(state == EXCHANGE) {
 		p = parse_int(message, next_char);
@@ -286,7 +288,13 @@ void play_game(char *message, Address remaddr) {
 
 		send_message(message, users[p].addr);
 		if((pone == 3) && (ptwo == 3) && (pthree == 3) && (pfour == 3)) {
+			printf("exchange\n");
 			exchange_cards();
+
+			// Notifies the first player
+			sprintf(buf, "%d %d play", GAME, 0);
+			printf("Player %d starts\n", turn);
+			send_message(buf, users[turn].addr);
 		}
 
 		return;
@@ -294,24 +302,64 @@ void play_game(char *message, Address remaddr) {
 
 	if(state == HAND) {
 		// Receives a card played
+		p = parse_int(message, next_char);
+		suit = parse_int(message, next_char);
+		set = parse_int(message, next_char);
+		played[pcard].suit = suit;
+		played[pcard].set = set;
+		played[pcard].player = p;
 
 		// Sends the card to the other players
+		for(i = 0; i < MAXUSERS; ++i) {
+			send_message(message, users[i].addr);
+		}
+
+		// Increases the flag
+		++pcard;
 
 		// Checks if all the players has played
-			// Checks who won the round
-
+		if(pcard == MAXUSERS) {
 			// Calculates the points
+			turn = play_round();
 
 			// Notifies players
+			sprintf(buf, "%d %d ", GAME, turn);
+			for(i = 0; i < MAXUSERS; ++i) {
+				send_message(buf, users[i].addr);
+			}
 
 			// Restarts a round
+			pcard = 0;
+			--round_left;
+		}
 
 		// Checks if all the rounds have been played
+		if(round_left == 0) {
 			// Compares the points
+			moon = compare_points();
+			if(moon > -1) {
+				reset_points();
+				users[moon].points = -MOON;
+			}
+
+			// Adds the points to the score
+			sprintf(buf, "%s", add_points());
 
 			// Notifies the players
+			for(i = 0; i < MAXUSERS; ++i) {
+				send_message(buf, users[i].addr);
+			}
 
 			// Changes state to PAUSE
+			state = PAUSE;
+		} else {
+			// Notifies the next player
+			if(pcard != 0) {
+				turn = (turn + 1) % 4;
+			}
+			sprintf(buf, "%d %d play", GAME, pcard);
+			send_message(buf, users[turn].addr);
+		}
 	}
 }
 
@@ -346,6 +394,41 @@ int check_action(int action) {
 	}
 
 	return 0;
+}
+
+void reset_points() {
+	int i;
+
+	for (i = 0; i < MAXUSERS; ++i) {
+		users[i].points = 0;
+	}
+}
+
+char *add_points() {
+	char *buf = malloc(sizeof(char*));
+	char c[BUFSIZE];
+	int i;
+
+	for(i = 0; i < MAXUSERS; ++i) {
+		users[i].score += users[i].points;
+		users[i].points = 0;
+		sprintf(c, "%d %d ", i, users[i].score);
+		strcat(buf, c);
+	}
+
+	return buf;
+}
+
+int compare_points() {
+	int i, moon = -1;
+
+	for(i = 0; i < MAXUSERS; ++i) {
+		if(users[i].points == MOON) {
+			moon = i;
+		}
+	}
+
+	return moon;
 }
 
 /*
@@ -494,12 +577,31 @@ void exchange_cards() {
 	// Changes state
 	state = HAND;
 
-	// Notifies the first player
-	sprintf(buf, "%d %d play", GAME, turn);
-	send_message(buf, users[turn].addr);
-
 	// Sets the pointer buffer
 	pcard = 0;
+	round_left = 13;
+}
+
+int play_round() {
+	int i, win = 0, points = 0;
+
+	for(i = 0; i < MAXUSERS; ++i) {
+		if(played[i].suit == HEARTS) {
+			++points;
+		}
+
+		if(card_value(played[i].suit, played[i].set) == SPADES_QUEEN) {
+			points += 13;
+		}
+
+		if((played[win].suit == played[i].suit) && (played[i].set > played[win].set)) {
+			win = i;
+		}
+	}
+
+	users[win].points += points;
+
+	return win;
 }
 
 /*
@@ -548,7 +650,6 @@ void server() {
 			// Check if the action is correct
 			if(check_action(action) < 0) {
 				sprintf(buf, "Not allowed request");
-				printf("Server: %s\n", buf);
 				send_message(buf, remaddr);
 			} else {
 				// Process the request

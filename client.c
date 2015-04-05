@@ -584,6 +584,7 @@ void play_card(char *message) {
 			++cards;
 			if(cards == 3) {
 				play = WAIT;
+				state = HAND;
 				cards = 0;
 			}
 		} else {
@@ -601,18 +602,21 @@ void play_card(char *message) {
 	if(state == HAND) {
 		// Round
 		turn = parse_int(message, next_char);
+		sprintf(buf, "%s", consume(message, next_char));
 
 		// Receives notifications
-		if(strcmp(consume(message, next_char), "play") == 0) {
+		if(strcmp(buf, "play") == 0) {
 			play = PLAY;
-			if(turn == player_number) {
+			if(turn == 0) {
 				current_suit = -1;
 			}
 			display_message("It is your turn, please choose a card\n", view, "bold");
 		} else {
-			player = parse_int(message, next_char);
-			suit = parse_int(message, next_char);
-			set = parse_int(message, next_char);
+			// resets the next_char pointer
+			next_char[0] = 0;
+			player = parse_int(buf, next_char);
+			suit = parse_int(buf, next_char);
+			set = parse_int(buf, next_char);
 
 			sprintf(c, "%s %s", suit_string(suit), set_string(set));
 
@@ -637,11 +641,13 @@ void play_card(char *message) {
 				// Checks last round
 				if(cards == 0) {
 					state = PAUSE;
+				} else {
+					state = ROUND;
 				}
 			}
 
 			// Someone played hearts
-			if(suit == HEARTS) {
+			if((suit == HEARTS) && (hearts == 0)) {
 				++hearts;
 			}
 
