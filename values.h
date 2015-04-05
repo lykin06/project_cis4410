@@ -6,6 +6,7 @@
 #define BROADCAST 	1
 #define CONNECT 	2
 #define QUIT 		3
+#define ADD_CARD	4
 
 // Different important values
 #define BUFSIZE 	512
@@ -26,10 +27,10 @@
 #define ROUND			4
 #define PAUSE			5
 
-// Different exchange
-#define LEFT	0
-#define FRONT	1
-#define RIGHT	2
+// Different exchange values
+#define LEFT	1
+#define FRONT	2
+#define RIGHT	3
 
 // IP address of the server
 #define IP "131.104.232.117"

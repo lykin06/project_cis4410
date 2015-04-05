@@ -479,7 +479,7 @@ void give_cards() {
 	for(i = 0; i < MAX_SET; ++i) {
 		for(j = 0; j < MAXUSERS; ++j) {
 			deck[card].player = i;
-			sprintf(message, "%d %d %d ", GAME, deck[card].suit, deck[card].set);
+			sprintf(message, "%d %d %d ", ADD_CARD, deck[card].suit, deck[card].set);
 			send_message(message, users[j].addr);
 
 			// Sets the first player
@@ -492,80 +492,36 @@ void give_cards() {
 	}
 }
 
-/*
- * Gives the three cards from a player to another
- *
- * TODO Refractoring
- */
-void exchange_cards() {
-	int i, j;
+void send_card(int suit, int set, int sender) {
+	int receiver;
 	char buf[BUFSIZE];
 
+	// Computes the receiver
+	receiver = (sender + exchange) % MAXUSERS;
+
+	// Sets the message to send
+	sprintf(buf, "%d %d %d ", ADD_CARD, suit, set);
+
+	// Sends the message
+	send_message(buf, users[receiver].addr);
+
+	// Changes the value of the first player
+	if(card_value(suit, set) == SPADES_QUEEN) {
+		turn = receiver;
+	}
+}
+
+/*
+ * Gives the three cards from a player to another
+ */
+void exchange_cards() {
+	int i;
+
 	for(i = 0; i < 3; ++i) {
-		sprintf(buf, "%d %d %d ", GAME, one[i].suit, one[i].set);
-		switch(exchange) {
-			case LEFT:
-				j = 1;
-				break;
-			case FRONT:
-				j = 2;
-				break;
-			case RIGHT:
-				j = 3;
-				break;
-		}
-		send_message(buf, users[j].addr);
-		if(card_value(one[i].suit, one[i].set) == SPADES_QUEEN) {
-			turn = j;
-		}
-		sprintf(buf, "%d %d %d ", GAME, two[i].suit, two[i].set);
-		switch(exchange) {
-			case LEFT:
-				j = 2;
-				break;
-			case FRONT:
-				j = 3;
-				break;
-			case RIGHT:
-				j = 0;
-				break;
-		}
-		send_message(buf, users[j].addr);
-		if(card_value(two[i].suit, two[i].set) == SPADES_QUEEN) {
-			turn = j;
-		}
-		sprintf(buf, "%d %d %d ", GAME, three[i].suit, three[i].set);
-		switch(exchange) {
-			case LEFT:
-				j = 3;
-				break;
-			case FRONT:
-				j = 0;
-				break;
-			case RIGHT:
-				j = 1;
-				break;
-		}
-		send_message(buf, users[j].addr);
-		if(card_value(three[i].suit, three[i].set) == SPADES_QUEEN) {
-			turn = j;
-		}
-		sprintf(buf, "%d %d %d ", GAME, four[i].suit, four[i].set);
-		switch(exchange) {
-			case LEFT:
-				j = 0;
-				break;
-			case FRONT:
-				j = 1;
-				break;
-			case RIGHT:
-				j = 2;
-				break;
-		}
-		send_message(buf, users[j].addr);
-		if(card_value(four[i].suit, four[i].set) == SPADES_QUEEN) {
-			turn = j;
-		}
+		send_card(one[i].suit, one[i].set, 0);
+		send_card(two[i].suit, two[i].set, 1);
+		send_card(three[i].suit, three[i].set, 2);
+		send_card(four[i].suit, four[i].set, 3);
 	}
 
 	if(exchange == RIGHT) {

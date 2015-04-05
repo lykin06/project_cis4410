@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 
 // Number of possible actions
-#define ACTIONS 4
+#define ACTIONS 5
 
 // Address
 typedef struct sockaddr_in Address;
@@ -58,6 +58,11 @@ void play_card(char *message);
  * Sends the message to the server
  */
 void send_message(char *message);
+
+/*
+ * Adds the card tot he list
+ */
+void add_card(char *message);
 
 #endif // CLIENT_H_
 

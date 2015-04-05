@@ -86,7 +86,7 @@ static void display_message(char *message, GtkWidget *view, char *tag) {
     GtkTextBuffer *buffer;
     GtkTextIter iter;
 
-   	printf("display_message \"%s\"\n", message);
+   	printf("display_message: %s\n", message);
 
     // Gets the buffer and the iter from the view
     buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
@@ -94,8 +94,6 @@ static void display_message(char *message, GtkWidget *view, char *tag) {
 
     // Insert the message at the beginning of the text field
    	gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, message, -1, "lmarg", tag, NULL);
-
-   	printf("end display_message\n");
 }
 
 /*
@@ -202,7 +200,6 @@ static void on_changed(GtkWidget *widget, gpointer label)
 		gtk_tree_model_get(model, &iter, LIST_ITEM, &selected_card,  -1);
 		gtk_label_set_text(GTK_LABEL(label), selected_card);
 		sprintf(text, "New card selected: %s\n", selected_card);
-		printf("%s", text);
 		display_message(text, view, "red_fg");
 	}
 }
@@ -367,6 +364,7 @@ void *receive_thread(void *data_thread) {
 	functions[1] = &broadcast;
 	functions[2] = &add_user;
 	functions[3] = &remove_user;
+	functions[4] = &add_card;
 
 	// Buffer to receive messages
 	char message[BUFSIZE];
@@ -654,6 +652,20 @@ void play_card(char *message) {
 			display_message(buf, view, "normal");
 		}
 	}
+}
+
+/*
+ * Adds the card tot he list
+ */
+void add_card(char *message) {
+	int suit, set;
+	char c[BUFSIZE];
+
+	suit = parse_int(message, next_char);
+	set = parse_int(message, next_char);
+	sprintf(c, "%s %s", suit_string(suit), set_string(set));
+	add_to_list(c);
+	printf("Added: %s\n", c);
 }
 
 /*
