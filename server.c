@@ -259,6 +259,8 @@ void play_game(char *message, Address remaddr) {
 	int p, suit, set, i, moon;
 	char buf[BUFSIZE];
 
+	printf("state %d\n", state);
+
 	if(state == EXCHANGE) {
 		p = parse_int(message, next_char);
 		suit = parse_int(message, next_char);
@@ -268,33 +270,49 @@ void play_game(char *message, Address remaddr) {
 				one[pone].suit = suit;
 				one[pone].set = set;
 				++pone;
+				i = 3 - pone;
 				break;
 			case 1:
 				two[ptwo].suit = suit;
 				two[ptwo].set = set;
 				++ptwo;
+				i = 3 - ptwo;
 				break;
 			case 2:
 				three[pthree].suit = suit;
 				three[pthree].set = set;
 				++pthree;
+				i = 3 - pthree;
 				break;
 			case 3:
 				four[pfour].suit = suit;
 				four[pfour].set = set;
 				++pfour;
+				i = 3 - pfour;
 				break;
 		}
 
-		send_message(message, users[p].addr);
-		if((pone == 3) && (ptwo == 3) && (pthree == 3) && (pfour == 3)) {
+		// Notifies the sender
+		sprintf(buf, "%d %d %d ", REMOVE_CARD, suit, set);
+		send_message(buf, users[p].addr);
+
+		if((pone + ptwo + pthree + pfour) == 12) {
 			printf("exchange\n");
 			exchange_cards();
 
 			// Notifies the first player
-			sprintf(buf, "%d %d play", GAME, 0);
+			sprintf(buf, "%d %d Please, selected a card", GAME, HAND);
 			printf("Player %d starts\n", turn);
 			send_message(buf, users[turn].addr);
+
+			state = HAND;
+		} else {
+			if(i > 0) {
+				sprintf(buf, "%d %d Please, selected %d more cards", GAME, EXCHANGE, i);
+			} else {
+				sprintf(buf, "%d %d Waiting for other players...", GAME, PLAYERS);
+			}
+			send_message(buf, users[p].addr);
 		}
 
 		return;
@@ -309,21 +327,29 @@ void play_game(char *message, Address remaddr) {
 		played[pcard].set = set;
 		played[pcard].player = p;
 
-		// Sends the card to the other players
+		// Sends the card to the players
 		for(i = 0; i < MAXUSERS; ++i) {
-			send_message(message, users[i].addr);
+			if(i == p) {
+				sprintf(buf, "%d %d %d ", REMOVE_CARD, suit, set);
+			} else {
+				sprintf(buf, "%d %d %d %d ", DISPLAY, p, suit, set);
+			}
+			send_message(buf, users[i].addr);
 		}
 
 		// Increases the flag
 		++pcard;
+		printf("Cards played %d\n", pcard);
 
 		// Checks if all the players has played
 		if(pcard == MAXUSERS) {
+			printf("End of round\n");
+
 			// Calculates the points
 			turn = play_round();
 
 			// Notifies players
-			sprintf(buf, "%d %d ", GAME, turn);
+			sprintf(buf, "%d %d %s won the round", GAME, PLAYERS, users[turn].name);
 			for(i = 0; i < MAXUSERS; ++i) {
 				send_message(buf, users[i].addr);
 			}
@@ -331,6 +357,7 @@ void play_game(char *message, Address remaddr) {
 			// Restarts a round
 			pcard = 0;
 			--round_left;
+			printf("%d rounds left\n", round_left);
 		}
 
 		// Checks if all the rounds have been played
@@ -342,22 +369,22 @@ void play_game(char *message, Address remaddr) {
 				users[moon].points = -MOON;
 			}
 
+			// Changes state to PAUSE
+			state = PAUSE;
+
 			// Adds the points to the score
-			sprintf(buf, "%s", add_points());
+			sprintf(buf, "%d %d %s", POINTS, PAUSE, add_points());
 
 			// Notifies the players
 			for(i = 0; i < MAXUSERS; ++i) {
 				send_message(buf, users[i].addr);
 			}
-
-			// Changes state to PAUSE
-			state = PAUSE;
 		} else {
 			// Notifies the next player
 			if(pcard != 0) {
 				turn = (turn + 1) % 4;
 			}
-			sprintf(buf, "%d %d play", GAME, pcard);
+			sprintf(buf, "%d %d Please, selected a card", GAME, HAND);
 			send_message(buf, users[turn].addr);
 		}
 	}
@@ -412,7 +439,7 @@ char *add_points() {
 	for(i = 0; i < MAXUSERS; ++i) {
 		users[i].score += users[i].points;
 		users[i].points = 0;
-		sprintf(c, "%d %d ", i, users[i].score);
+		sprintf(c, "%s %d ", users[i].name, users[i].score);
 		strcat(buf, c);
 	}
 
@@ -561,6 +588,25 @@ int play_round() {
 }
 
 /*
+ * Sets up a new game
+ */
+void setup_game() {
+	int i;
+	char buf[BUFSIZE];
+
+	shuffle_cards();
+	give_cards();
+	
+	// Notifies the players to exchange the cards
+	for(i = 0; i < MAXUSERS; ++i) {
+		sprintf(buf, "%d %d Please, select 3 cards.", GAME, EXCHANGE);
+		send_message(buf, users[i].addr);
+	}
+
+	state = EXCHANGE;
+}
+
+/*
  * Holds the main loop of the program
  * Receives and processes the messages from the client
  */
@@ -584,10 +630,7 @@ void server() {
 		}
 
 		if(state == GIVE_CARDS) {
-			shuffle_cards();
-			give_cards();
-			reset_cards();
-			state = EXCHANGE;
+			setup_game();
 		}
 
 		recvlen = recvfrom(server_socket, message, BUFSIZE, 0, (struct sockaddr *)&remaddr, &addrlen);

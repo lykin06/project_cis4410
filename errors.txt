@@ -1,0 +1,91 @@
+After removing a card:
+
+(clients:5409): GLib-GObject-CRITICAL **: g_object_ref: assertion 'object->ref_count > 0' failed
+
+(clients:5409): Pango-CRITICAL **: pango_layout_get_extents: assertion 'layout != NULL' failed
+
+(clients:5409): GLib-GObject-CRITICAL **: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
+
+=======================
+
+(clients:5348): Pango-CRITICAL **: pango_layout_get_extents: assertion 'layout != NULL' failed
+
+(clients:5348): Pango-CRITICAL **: pango_layout_is_wrapped: assertion 'layout != NULL' failed
+
+(clients:5348): Pango-CRITICAL **: pango_layout_is_ellipsized: assertion 'layout != NULL' failed
+
+(clients:5348): GLib-GObject-CRITICAL **: g_object_ref: assertion 'G_IS_OBJECT (object)' failed
+
+(clients:5348): Pango-CRITICAL **: pango_layout_get_pixel_extents: assertion 'PANGO_IS_LAYOUT (layout)' failed
+
+(clients:5348): Pango-CRITICAL **: pango_layout_get_iter: assertion 'PANGO_IS_LAYOUT (layout)' failed
+Segmentation fault (core dumped)
+
+========================
+
+**
+Gtk:ERROR:/build/buildd/gtk+3.0-3.12.2/./gtk/gtktextview.c:3954:gtk_text_view_validate_onscreen: assertion failed: (priv->onscreen_validated)
+Aborted (core dumped)
+
+========================
+
+(clients:6055): Gtk-ERROR **: Unknown segment type: 
+Trace/breakpoint trap (core dumped)
+
+========================
+
+Removed: Hearts Jack
+*** BUG ***
+In pixman_region_append_non_o: The expression y1 < y2 was false
+Set a breakpoint on '_pixman_log_error' to debug
+
+*** BUG ***
+In pixman_region_append_non_o: The expression r->x1 < r->x2 was false
+Set a breakpoint on '_pixman_log_error' to debug
+
+========================
+
+(clients:7481): Pango-CRITICAL **: pango_shape_full: assertion 'paragraph_text + paragraph_length >= 
+item_text + item_length' failed
+Segmentation fault (core dumped)
+
+========================
+
+*** Error in `./clients': double free or corruption (fasttop): 0x00007f13a0001aa0 ***
+Aborted (core dumped)
+
+========================
+
+Removed: Clubs Jack
+New card selected: Spades Ten
+New card selected: Spades Ten
+
+(clients:8008): GLib-GObject-CRITICAL **: g_object_ref: assertion 'object->ref_count > 0' failed
+Received: "0 2 Please, selected 1 more cards"
+
+(clients:8008): Pango-CRITICAL **: pango_layout_get_pixel_extents: assertion 'PANGO_IS_LAYOUT (layout)' failed
+Will perform action 0, next_char = 2
+
+(clients:8008): Pango-CRITICAL **: pango_layout_get_iter: assertion 'PANGO_IS_LAYOUT (layout)' failed
+play_card
+display_message: Please, selected 1 more cards
+
+Segmentation fault (core dumped)
+
+=========================
+
+display_message: Richard connected, waiting for more players
+
+
+(clients:8209): Gtk-ERROR **: Unknown segment type: 
+Trace/breakpoint trap (core dumped)
+
+=========================
+
+**
+Pango:ERROR:/build/buildd/pango1.0-1.36.6/./pango/pango-layout.c:3916:pango_layout_check_lines: assertion failed: (!layout->log_attrs)
+Received: "0 2 Please, selected 1 more cards"
+Will perform action 0, next_char = 2
+Aborted (core dumped)
+
+=========================

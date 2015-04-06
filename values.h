@@ -7,6 +7,9 @@
 #define CONNECT 	2
 #define QUIT 		3
 #define ADD_CARD	4
+#define REMOVE_CARD 5
+#define DISPLAY		6
+#define POINTS		7
 
 // Different important values
 #define BUFSIZE 	512
@@ -26,6 +29,7 @@
 #define HAND			3
 #define ROUND			4
 #define PAUSE			5
+#define PLAYERS			7
 
 // Different exchange values
 #define LEFT	1

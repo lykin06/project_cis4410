@@ -1,5 +1,5 @@
 #include <gtk/gtk.h>
-#include <webkit/webkit.h>
+#include <glib/gi18n.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -82,7 +82,7 @@ int hand[MAX_SUIT];
 /* 
  * Displays a plain text message into the text view
  */
-static void display_message(char *message, GtkWidget *view, char *tag) {
+static void display_message(char *message, char *tag) {
     GtkTextBuffer *buffer;
     GtkTextIter iter;
 
@@ -90,10 +90,10 @@ static void display_message(char *message, GtkWidget *view, char *tag) {
 
     // Gets the buffer and the iter from the view
     buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
-    gtk_text_buffer_get_iter_at_offset(buffer, &iter, 0);
+    gtk_text_buffer_get_iter_at_offset(buffer, &iter, -1);
 
     // Insert the message at the beginning of the text field
-   	gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, message, -1, "lmarg", tag, NULL);
+   	gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, message, -1, tag, NULL);
 }
 
 /*
@@ -108,30 +108,32 @@ static void button_clicked(GtkButton *button, gpointer user_data)
 	if(play == WAIT) {
 		sprintf(buf, "It is not your turn, please wait.\n");
 		printf("%s", buf);
-		display_message(buf, view, "red_fg");
+		display_message(buf, "red_fg");
 	} else {
 		if(strcmp(selected_card, "No cards") != 0) {
 			nc = malloc(sizeof(int));
 			nc[0] = 0;
 			parse_name(selected_card, buf, nc);
 			suit = suit_int(buf);
+			printf("Suit: %d %s\n", suit, buf);
 			parse_name(selected_card, buf, nc);
 			set = set_int(buf);
+			printf("Set: %d %s\n", set, buf);
 			sprintf(buf, "%d %d %d %d ", GAME, player_number, suit, set);
 			sprintf(selected_card, "No cards");
 		} else {
-			display_message("No card selected\n", view, "red_fg");
+			display_message("No card selected\n", "red_fg");
 			return;
 		}
 
 		if(state == HAND) {
 			if((current_suit != -1) && (suit != current_suit)) {
-				display_message("You cannot play this card!\n", view, "red_fg");
+				display_message("You cannot play this card!\n", "red_fg");
 				return;
 			}
 
 			if((suit == HEARTS) && (hearts == 0) && (current_suit == -1)) {
-				display_message("You cannot play hearts!\n", view, "red_fg");
+				display_message("You cannot play hearts!\n", "red_fg");
 				return;
 			}
 		}
@@ -194,13 +196,11 @@ static void on_changed(GtkWidget *widget, gpointer label)
 {
 	GtkTreeIter iter;
 	GtkTreeModel *model;
-	char text[BUFSIZE];
 
 	if (gtk_tree_selection_get_selected(GTK_TREE_SELECTION(widget), &model, &iter)) {
 		gtk_tree_model_get(model, &iter, LIST_ITEM, &selected_card,  -1);
 		gtk_label_set_text(GTK_LABEL(label), selected_card);
-		sprintf(text, "New card selected: %s\n", selected_card);
-		display_message(text, view, "red_fg");
+		printf("New card selected: %s\n", selected_card);
 	}
 }
 
@@ -227,7 +227,7 @@ static void entry_activate_cb (GtkEntry *entry, GtkWidget *view)
     sprintf(text, "You: %s\n", gtk_entry_get_text(entry));
     sprintf(message, "%d %s %s", BROADCAST, n, gtk_entry_get_text(entry));
 	send_message(message);
-	display_message(text, view, "blue_fg");
+	display_message(text, "blue_fg");
     gtk_entry_set_text (entry, "");
 }
 
@@ -365,6 +365,8 @@ void *receive_thread(void *data_thread) {
 	functions[2] = &add_user;
 	functions[3] = &remove_user;
 	functions[4] = &add_card;
+	functions[5] = &remove_card;
+	functions[6] = &display_card;
 
 	// Buffer to receive messages
 	char message[BUFSIZE];
@@ -442,7 +444,7 @@ void add_user(char *message) {
 	} else {
 		sprintf(text, "%s connected, enough players connected\nThe game can start!\n", value);
 	}
-	display_message(text, view, "bold");
+	display_message(text, "bold");
 
 	// Add the new user
 	switch(number_users) {
@@ -477,7 +479,7 @@ void remove_user(char *message) {
 	printf("Remove user: %s\n", name);
 	// Print a message
 	sprintf(text, "%s disconnected\n", name);
-	display_message(text, view, "bold");
+	display_message(text, "bold");
 
 	// Get the users
 	sprintf(p, "%s", gtk_label_get_text(GTK_LABEL(label_player_one)));
@@ -511,15 +513,27 @@ void broadcast(char *message) {
    	parse_name(message, name, next_char);
    	sprintf(text, "%s: %s\n", name, consume(message, next_char));
    	
-   	display_message(text, view, "blue_fg");
+   	display_message(text, "blue_fg");
 }
 
-void remove_card(char *c) {
+/*
+ * Removes the card from the list
+ */
+void remove_card(char *message) {
 	GtkListStore *store;
 	GtkTreeModel *model;
 	GtkTreeIter iter;
 	char *value;
+	char c[BUFSIZE];
 	gboolean isvalid;
+	int set, suit;
+
+	suit = parse_int(message, next_char);
+	set = parse_int(message, next_char);
+
+	sprintf(c, "%s %s", suit_string(suit), set_string(set));
+	printf("Removed: %s\n", c);
+	--hand[suit];
 
 	// Get the list
 	store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW (list)));
@@ -536,121 +550,55 @@ void remove_card(char *c) {
 		if(strcmp(c, value) == 0) {
 			// Remove the card
 			gtk_list_store_remove(store, &iter);
+			play = WAIT;
 			return;
 		}
 		
 		// Get the next card
 		isvalid = gtk_tree_model_iter_next(model, &iter);
 	}
+
+	printf("ERROR - Didn't find the card to remove\n");
 }
 
 /*
- *
+ * Displays a card played by another player
+ */
+void display_card(char *message) {
+	int set, suit, player;
+	char buf[BUFSIZE];
+	printf("display_card\n");
+	// Parses the values
+	player = parse_int(message, next_char);
+	suit = parse_int(message, next_char);
+	set = parse_int(message, next_char);
+
+	// Displays the played card
+	sprintf(buf, "Player %d played %s %s\n", player, suit_string(suit), set_string(set));
+	display_message(buf, "normal");
+
+	// Someone played hearts
+	if((suit == HEARTS) && (hearts == 0)) {
+		++hearts;
+	}
+
+	// First card
+	if((current_suit == -1) && (hand[suit] > 0)) {
+		current_suit = suit;
+	}
+}
+
+/*
+ * Does different actions based on the server inputs
  */
 void play_card(char *message) {
-	int suit, set, player, turn;
 	char buf[BUFSIZE];
-	char c[BUFSIZE];
-		
-	if(state == GIVE_CARDS) {
-		suit = parse_int(message, next_char);
-		set = parse_int(message, next_char);
-		sprintf(c, "%s %s", suit_string(suit), set_string(set));
-		add_to_list(c);
-		++hand[suit];
-		++cards;
-		if(cards == MAX_SET) {
-			state = EXCHANGE;
-			play = PLAY;
-			//sprintf(buf, "Choose 3 cards to send to an opponent\n");
-			//display_message(buf, view, "red_fg");
-			cards = 0;
-		}
-		return;
-	}
-
-	if(state == EXCHANGE) {
-		if(play == PLAY) {
-			player = parse_int(message, next_char);
-			suit = parse_int(message, next_char);
-			set = parse_int(message, next_char);
-			sprintf(c, "%s %s", suit_string(suit), set_string(set));
-			sprintf(buf, "You choosed: %s\n", c);
-			remove_card(c);
-			--hand[suit];
-			display_message(buf, view, "normal");
-			++cards;
-			if(cards == 3) {
-				play = WAIT;
-				state = HAND;
-				cards = 0;
-			}
-		} else {
-			suit = parse_int(message, next_char);
-			set = parse_int(message, next_char);
-			sprintf(c, "%s %s", suit_string(suit), set_string(set));
-			sprintf(buf, "You received: %s\n", c);
-			add_to_list(c);
-			++hand[suit];
-			display_message(buf, view, "normal");
-		}
-		return;
-	}
-
-	if(state == HAND) {
-		// Round
-		turn = parse_int(message, next_char);
-		sprintf(buf, "%s", consume(message, next_char));
-
-		// Receives notifications
-		if(strcmp(buf, "play") == 0) {
-			play = PLAY;
-			if(turn == 0) {
-				current_suit = -1;
-			}
-			display_message("It is your turn, please choose a card\n", view, "bold");
-		} else {
-			// resets the next_char pointer
-			next_char[0] = 0;
-			player = parse_int(buf, next_char);
-			suit = parse_int(buf, next_char);
-			set = parse_int(buf, next_char);
-
-			sprintf(c, "%s %s", suit_string(suit), set_string(set));
-
-			if(player == player_number) {
-				sprintf(buf, "You played: %s\n", c);
-				remove_card(c);
-				--hand[suit];
-				--cards;
-			} else {
-				sprintf(buf, "Player %d played: %s\n", player, c);
-			}
-
-			// Actual suit
-			if(turn == 0) {
-				if(hand[suit] == 0) {
-					// We can play other cards
-					current_suit = -1;
-				} else {
-					current_suit = suit;
-				}
-			} else if(turn == 3) {
-				// Checks last round
-				if(cards == 0) {
-					state = PAUSE;
-				} else {
-					state = ROUND;
-				}
-			}
-
-			// Someone played hearts
-			if((suit == HEARTS) && (hearts == 0)) {
-				++hearts;
-			}
-
-			display_message(buf, view, "normal");
-		}
+	printf("play_card\n");
+	state = parse_int(message, next_char);
+	sprintf(buf, "%s\n", consume(message, next_char));
+	display_message(buf, "normal");
+	if(state != PLAYERS) {
+		play = PLAY;
 	}
 }
 
@@ -666,6 +614,25 @@ void add_card(char *message) {
 	sprintf(c, "%s %s", suit_string(suit), set_string(set));
 	add_to_list(c);
 	printf("Added: %s\n", c);
+	++hand[suit];
+}
+
+/*
+ *
+ */
+void display_points(char *message) {
+	int i, points;
+	char *name = malloc(sizeof(char *));
+	char buf[BUFSIZE];
+
+	state = parse_int(message, next_char);
+
+	for(i = 0; i < MAXUSERS; ++i) {
+		parse_name(message, name, next_char);
+		points = parse_int(message, next_char);
+		sprintf(buf, "%s has %d points", name, points);
+		display_message(buf, "bold");
+	}
 }
 
 /*
@@ -716,9 +683,6 @@ int main(int argc, char **argv) {
 	printf("Sending: %s\n", buf);
 	if (sendto(cs, buf, strlen(buf), 0, (struct sockaddr *)&addr, len) < 0) {
 		perror("ERROR - sendto failed");
-		free(n);
-		free(buf);
-		free(next_char);
 		return -1;
 	}
 
@@ -804,7 +768,5 @@ int main(int argc, char **argv) {
 	pthread_mutex_destroy(&mutex);
 
 	close(cs);
-	free(buf);
-	free(next_char);
 	return 0;
 }
