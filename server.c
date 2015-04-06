@@ -318,8 +318,8 @@ void play_game(char *message, Address remaddr) {
 			exchange_cards();
 
 			// Notifies the first player
-			sprintf(buf, "%d %d Please, selected a card", GAME, HAND);
-			printf("Player %d starts\n", turn);
+			sprintf(buf, "%d %d Please, selected the two of spades", GAME, HAND);
+			printf("%s starts the game\n", users[turn].name);
 			send_message(buf, users[turn].addr);
 
 			state = HAND;
@@ -546,8 +546,9 @@ void give_cards() {
 			send_message(message, users[j].addr);
 
 			// Sets the first player
-			if(card_value(deck[card].suit, deck[card].set) == SPADES_QUEEN) {
+			if(card_value(deck[card].suit, deck[card].set) == TWO) {
 				turn = j;
+				printf("%s has the two of spades\n", users[turn].name);
 			}
 
 			++card;
@@ -569,8 +570,9 @@ void send_card(int suit, int set, int sender) {
 	send_message(buf, users[receiver].addr);
 
 	// Changes the value of the first player
-	if(card_value(suit, set) == SPADES_QUEEN) {
+	if(card_value(suit, set) == TWO) {
 		turn = receiver;
+		printf("%s has the two of spades\n", users[turn].name);
 	}
 }
 

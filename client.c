@@ -53,11 +53,12 @@ int player_number;
 // Flag indicating the turn
 int play;
 
-// Labels to print the number of users
+// Labels
 GtkWidget *label_users;
 GtkWidget *label_player_one;
 GtkWidget *label_player_two;
 GtkWidget *label_player_three;
+GtkWidget *label_instructions;
 
 // Pointer to the next char to read
 int *next_char;
@@ -120,22 +121,34 @@ static void button_clicked(GtkButton *button, gpointer user_data)
 			set = set_int(buf);
 			printf("Set: %d %s\n", set, buf);
 			sprintf(buf, "%d %d %d %d ", GAME, player_number, suit, set);
-			sprintf(selected_card, "No cards");
 		} else {
 			display_message("No card selected\n", "red_fg");
 			return;
 		}
 
 		if(state == HAND) {
-			if((current_suit != -1) && (suit != current_suit)) {
-				display_message("You cannot play this card!\n", "red_fg");
-				return;
-			}
-
-			if((suit == HEARTS) && (hearts == 0) && (current_suit == -1)) {
-				display_message("You cannot play hearts!\n", "red_fg");
-				return;
-			}
+			switch(current_suit) {
+				case TWO_OF_SPADES:
+					if(card_value(suit, set) != TWO) {
+						display_message("You have to play the two of spades!\n", "red_fg");
+						return;
+					}
+					break;
+				case ANY_BUT_HEARTS:
+					if(suit == HEARTS) {
+						display_message("You cannot play hearts!\n", "red_fg");
+						return;
+					}
+					break;
+				case ANY:
+					break;
+				default:
+					if(suit != current_suit) {
+						display_message("You cannot play this card!\n", "red_fg");
+						return;
+					}
+					break;
+			}	
 		}
 
 		send_message(buf);
@@ -278,11 +291,13 @@ static GtkWidget* create_window(void)
 	label_player_one = gtk_label_new("Player");
 	label_player_two = gtk_label_new("Player");
 	label_player_three = gtk_label_new("Player");
+	label_instructions = gtk_label_new("Waiting for all the players...");
 	gtk_label_set_justify(GTK_LABEL(label_list), GTK_JUSTIFY_CENTER);
 	gtk_label_set_justify(GTK_LABEL(label_users), GTK_JUSTIFY_CENTER);
 	gtk_label_set_justify(GTK_LABEL(label_player_one), GTK_JUSTIFY_CENTER);
 	gtk_label_set_justify(GTK_LABEL(label_player_two), GTK_JUSTIFY_CENTER);
 	gtk_label_set_justify(GTK_LABEL(label_player_three), GTK_JUSTIFY_CENTER);
+	gtk_label_set_justify(GTK_LABEL(label_instructions), GTK_JUSTIFY_CENTER);
 	
 	/* Create a new entry */
 	entry = gtk_entry_new();
@@ -315,8 +330,9 @@ static GtkWidget* create_window(void)
 	gtk_box_pack_start(GTK_BOX (box_players), label_player_three, FALSE, FALSE, 5);
 	gtk_box_pack_start(GTK_BOX (box_game), box_players, FALSE, FALSE, 5);	
 	gtk_box_pack_start(GTK_BOX (box_message), scroll, TRUE, TRUE, 5);
+	gtk_box_pack_start(GTK_BOX (box_message), label_instructions, FALSE, FALSE, 5);
 	gtk_box_pack_start(GTK_BOX (box_message), entry, FALSE, FALSE, 5);
-	gtk_box_pack_start(GTK_BOX (box_game), box_message, TRUE, TRUE, 5);
+	gtk_box_pack_start(GTK_BOX (box_game), box_message, TRUE, TRUE, 0);
 	gtk_box_pack_start(GTK_BOX (box_window), box_game, TRUE, TRUE, 5);
 	gtk_box_pack_start(GTK_BOX (box_list), label_users, FALSE, FALSE, 5);
 	gtk_box_pack_start(GTK_BOX (box_list), list, TRUE, TRUE, 5);
@@ -542,6 +558,7 @@ void remove_card(char *message) {
 	printf("%s", buf);
 	display_message(buf, "bold");
 	--hand[suit];
+	sprintf(selected_card, "No cards");
 
 	// Get the list
 	store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW (list)));
@@ -592,8 +609,14 @@ void display_card(char *message) {
 	}
 
 	// First card
-	if((current_suit == -1) && (hand[suit] > 0)) {
-		current_suit = suit;
+	if(current_suit < 0) {
+		if(hand[suit] > 0) {
+			current_suit = suit;
+		} else if(hearts == 0) {
+			current_suit = ANY_BUT_HEARTS;
+		} else {
+			current_suit = ANY;
+		}
 	}
 }
 
@@ -601,11 +624,9 @@ void display_card(char *message) {
  * Does different actions based on the server inputs
  */
 void play_card(char *message) {
-	char buf[BUFSIZE];
 	printf("play_card\n");
 	state = parse_int(message, next_char);
-	sprintf(buf, "%s\n", consume(message, next_char));
-	display_message(buf, "normal");
+	gtk_label_set_text(GTK_LABEL(label_instructions), consume(message, next_char));
 	if(state != PLAYERS) {
 		play = PLAY;
 	}
@@ -730,7 +751,7 @@ int main(int argc, char **argv) {
 	cards = 0;
 	sprintf(selected_card, "No cards");
 	hearts = 0;
-	current_suit = -1;
+	current_suit = TWO_OF_SPADES;
 	for(i = 0; i < MAX_SUIT; ++i) {
 		hand[i] = 0;
 	}

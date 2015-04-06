@@ -12,7 +12,7 @@
 typedef struct card_t
 {
 	enum {SPADES, HEARTS, DIAMONDS, CLUBS} suit;
-	enum {ACE, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING} set;
+	enum {TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING, ACE} set;
 	int player;
 } Card;
 

@@ -45,8 +45,6 @@ int suit_int(char *name) {
  */
 char *set_string(int set) {
 	switch(set) {
-		case ACE:
-			return "Ace";
 		case TWO:
 			return "Two";
 		case THREE:
@@ -71,9 +69,11 @@ char *set_string(int set) {
 			return "Queen";
 		case KING:
 			return "King";
+		case ACE:
+			return "Ace";
 	}
 
-	return "";
+	return "ERROR";
 }
 
 /*

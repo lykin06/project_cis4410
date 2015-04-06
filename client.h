@@ -6,6 +6,11 @@
 // Number of possible actions
 #define ACTIONS 9
 
+// Different cases for the card selection
+#define ANY_BUT_HEARTS	-3
+#define TWO_OF_SPADES 	-2
+#define ANY				-1
+
 // Address
 typedef struct sockaddr_in Address;
 
