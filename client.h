@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 
 // Number of possible actions
-#define ACTIONS 7
+#define ACTIONS 9
 
 // Address
 typedef struct sockaddr_in Address;
@@ -73,6 +73,16 @@ void remove_card(char *message);
  * Displays a card played by another player
  */
 void display_card(char *message);
+
+/*
+ * Displays the points at the end of the game
+ */
+void display_points(char *message);
+
+/*
+ * Displays the player who lost
+ */
+void display_end(char *message);
 
 #endif // CLIENT_H_
 

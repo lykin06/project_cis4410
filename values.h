@@ -10,6 +10,7 @@
 #define REMOVE_CARD 5
 #define DISPLAY		6
 #define POINTS		7
+#define END 		8
 
 // Different important values
 #define BUFSIZE 	512

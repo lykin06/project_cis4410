@@ -214,6 +214,9 @@ void disconnect(char *message, Address remaddr) {
 	
 	--number_users;
 	printf("User removed, %d users left\n", number_users);
+
+	// Change the state
+	state = WAITING;
 }
 
 /*
@@ -224,11 +227,25 @@ void broadcast(char *message, Address remaddr) {
 	int i;
 	int id;
 	char *n = malloc(sizeof(char) * BUFSIZE);
+	char buf[BUFSIZE];
 	
 	// Get user name
 	parse_name(message, n, next_char);
 	id = get_userid(n);
 	printf("Sender: %s, id: %d, next_char = %d\n", n, id, *next_char);
+
+	// Parse the rest of the message
+	sprintf(buf, "%s", consume(message, next_char));
+
+	// Waiting for all the users
+	if(state == PAUSE) {
+		if(strcmp(buf, "ready") == 0) {
+			++pcard;
+			if(pcard == MAXUSERS) {
+				state = GIVE_CARDS;
+			}
+		}
+	}
 	
 	if(id >= 0) {
 		printf("Known user\n");
@@ -256,7 +273,7 @@ void broadcast(char *message, Address remaddr) {
  * Sends the message to one user
  */
 void play_game(char *message, Address remaddr) {
-	int p, suit, set, i, moon;
+	int p, suit, set, i, moon, loser, points;
 	char buf[BUFSIZE];
 
 	printf("state %d\n", state);
@@ -332,7 +349,7 @@ void play_game(char *message, Address remaddr) {
 			if(i == p) {
 				sprintf(buf, "%d %d %d ", REMOVE_CARD, suit, set);
 			} else {
-				sprintf(buf, "%d %d %d %d ", DISPLAY, p, suit, set);
+				sprintf(buf, "%d %s %d %d ", DISPLAY, users[p].name, suit, set);
 			}
 			send_message(buf, users[i].addr);
 		}
@@ -365,8 +382,13 @@ void play_game(char *message, Address remaddr) {
 			// Compares the points
 			moon = compare_points();
 			if(moon > -1) {
-				reset_points();
-				users[moon].points = -MOON;
+				for(i = 0; i < MAXUSERS; ++i) {
+					if(i != moon) {
+						users[i].points = MOON;
+					} else {
+						users[i].points = 0;
+					}
+				}
 			}
 
 			// Changes state to PAUSE
@@ -376,8 +398,22 @@ void play_game(char *message, Address remaddr) {
 			sprintf(buf, "%d %d %s", POINTS, PAUSE, add_points());
 
 			// Notifies the players
+			loser = -1;
+			points = 100;
 			for(i = 0; i < MAXUSERS; ++i) {
 				send_message(buf, users[i].addr);
+				if(users[i].score > points) {
+					loser = i;
+					points = users[i].score;
+				}
+			}
+
+			// End game
+			if(loser > -1) {
+				sprintf(buf, "%d %s", END, users[loser].name);
+				for(i = 0; i < MAXUSERS; ++i) {
+					send_message(buf, users[i].addr);
+				}
 			}
 		} else {
 			// Notifies the next player

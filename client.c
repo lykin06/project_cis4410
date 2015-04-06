@@ -367,6 +367,8 @@ void *receive_thread(void *data_thread) {
 	functions[4] = &add_card;
 	functions[5] = &remove_card;
 	functions[6] = &display_card;
+	functions[7] = &display_points;
+	functions[8] = &display_end;
 
 	// Buffer to receive messages
 	char message[BUFSIZE];
@@ -501,6 +503,9 @@ void remove_user(char *message) {
 
 	// Decreases the number of users
 	--number_users;
+
+	// Change the state
+	state = WAITING;
 }
 
 /*
@@ -523,8 +528,9 @@ void remove_card(char *message) {
 	GtkListStore *store;
 	GtkTreeModel *model;
 	GtkTreeIter iter;
-	char *value;
+	gchar *value;
 	char c[BUFSIZE];
+	char buf[BUFSIZE];
 	gboolean isvalid;
 	int set, suit;
 
@@ -532,7 +538,9 @@ void remove_card(char *message) {
 	set = parse_int(message, next_char);
 
 	sprintf(c, "%s %s", suit_string(suit), set_string(set));
-	printf("Removed: %s\n", c);
+	sprintf(buf, "Removed: %s\n", c);
+	printf("%s", buf);
+	display_message(buf, "bold");
 	--hand[suit];
 
 	// Get the list
@@ -553,7 +561,7 @@ void remove_card(char *message) {
 			play = WAIT;
 			return;
 		}
-		
+		g_free(value);
 		// Get the next card
 		isvalid = gtk_tree_model_iter_next(model, &iter);
 	}
@@ -565,16 +573,17 @@ void remove_card(char *message) {
  * Displays a card played by another player
  */
 void display_card(char *message) {
-	int set, suit, player;
+	int set, suit;
 	char buf[BUFSIZE];
+	char player[BUFSIZE];
 	printf("display_card\n");
 	// Parses the values
-	player = parse_int(message, next_char);
+	parse_name(message, player, next_char);
 	suit = parse_int(message, next_char);
 	set = parse_int(message, next_char);
 
 	// Displays the played card
-	sprintf(buf, "Player %d played %s %s\n", player, suit_string(suit), set_string(set));
+	sprintf(buf, "%s played %s %s\n", player, suit_string(suit), set_string(set));
 	display_message(buf, "normal");
 
 	// Someone played hearts
@@ -618,7 +627,7 @@ void add_card(char *message) {
 }
 
 /*
- *
+ * Displays the points at the end of the game
  */
 void display_points(char *message) {
 	int i, points;
@@ -630,9 +639,21 @@ void display_points(char *message) {
 	for(i = 0; i < MAXUSERS; ++i) {
 		parse_name(message, name, next_char);
 		points = parse_int(message, next_char);
-		sprintf(buf, "%s has %d points", name, points);
+		sprintf(buf, "%s has %d points\n", name, points);
 		display_message(buf, "bold");
 	}
+
+	sprintf(buf, "The game is over, if you want to play again enter \"ready\"\n");
+	display_message(buf, "bold");
+}
+
+/*
+ * Displays the player who lost
+ */
+void display_end(char *message) {
+	char buf[BUFSIZE];
+	sprintf(buf, "%s lost the game.\n", consume(message, next_char));
+	display_message(buf, "red_fg");
 }
 
 /*
